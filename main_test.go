@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/cert-manager/cert-manager/test/acme/dns"
+	acmetest "github.com/cert-manager/cert-manager/test/acme"
 )
 
 var (
@@ -12,11 +12,11 @@ var (
 )
 
 func TestRunsSuite(t *testing.T) {
-	fixture := dns.NewFixture(&yandexCloudDNSSolver{},
-		dns.SetResolvedZone(zone),
-		dns.SetAllowAmbientCredentials(false),
-		dns.SetManifestPath("testdata/yandex-cloud-dns"),
-		dns.SetStrict(true),
+	fixture := acmetest.NewFixture(&yandexCloudDNSSolver{},
+		acmetest.SetResolvedZone(zone),
+		acmetest.SetAllowAmbientCredentials(false),
+		acmetest.SetManifestPath("testdata/yandex-cloud-dns"),
+		acmetest.SetStrict(true),
 	)
 
 	fixture.RunConformance(t)
