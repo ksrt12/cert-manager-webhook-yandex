@@ -4,18 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/pkg/errors"
 	"github.com/yandex-cloud/go-genproto/yandex/cloud/dns/v1"
 	ycsdk "github.com/yandex-cloud/go-sdk"
 	"github.com/yandex-cloud/go-sdk/iamkey"
 	"k8s.io/client-go/kubernetes"
-	"os"
-	"time"
 
-	"github.com/jetstack/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
-	"github.com/jetstack/cert-manager/pkg/acme/webhook/cmd"
-	capi "github.com/jetstack/cert-manager/pkg/apis/meta/v1"
-	"github.com/jetstack/cert-manager/pkg/issuer/acme/dns/util"
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
+	"github.com/cert-manager/cert-manager/pkg/acme/webhook/cmd"
+	capi "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+	"github.com/cert-manager/cert-manager/pkg/issuer/acme/dns/util"
 	extapi "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/rest"
@@ -40,7 +41,7 @@ func main() {
 
 // yandexCloudDNSSolver implements the provider-specific logic needed to
 // 'present' an ACME challenge TXT record for your own DNS provider.
-// To do so, it must implement the `github.com/jetstack/cert-manager/pkg/acme/webhook.Solver`
+// To do so, it must implement the `github.com/cert-manager/cert-manager/pkg/acme/webhook.Solver`
 // interface.
 type yandexCloudDNSSolver struct {
 	client *kubernetes.Clientset
@@ -88,7 +89,7 @@ func (c *yandexCloudDNSSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 		return err
 	}
 
-	zone, err := c.getDNSZone(ch.ResolvedZone)
+	zone, err := c.getDNSZone(ch.ResolvedZone, ch.ResolvedFQDN)
 	if err != nil {
 		return err
 	}
@@ -124,7 +125,7 @@ func (c *yandexCloudDNSSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 // This is in order to facilitate multiple DNS validations for the same domain
 // concurrently.
 func (c *yandexCloudDNSSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
-	zone, err := c.getDNSZone(ch.ResolvedZone)
+	zone, err := c.getDNSZone(ch.ResolvedZone, ch.ResolvedFQDN)
 	if err != nil {
 		return err
 	}
@@ -153,8 +154,9 @@ func (c *yandexCloudDNSSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	return nil
 }
 
-func (c *yandexCloudDNSSolver) getDNSZone(zone string) (*dns.DnsZone, error) {
-	resolvedZone, err := util.FindZoneByFqdn(zone, util.RecursiveNameservers)
+func (c *yandexCloudDNSSolver) getDNSZone(zone string, fqdn string) (*dns.DnsZone, error) {
+	ctx := context.Background()
+	resolvedZone, err := util.FindZoneByFqdn(ctx, fqdn, util.RecursiveNameservers)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +166,7 @@ func (c *yandexCloudDNSSolver) getDNSZone(zone string) (*dns.DnsZone, error) {
 		Filter:   `zone = "` + resolvedZone + `"`,
 	}
 
-	resp, err := c.sdk.DNS().DnsZone().List(context.Background(), &req)
+	resp, err := c.sdk.DNS().DnsZone().List(ctx, &req)
 	if err != nil {
 		return nil, err
 	}
